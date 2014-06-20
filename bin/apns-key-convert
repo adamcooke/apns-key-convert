@@ -1,0 +1,66 @@
+#!/usr/bin/env ruby
+
+class String
+  def red
+    "\e[31m#{self}\e[0m"
+  end
+end
+
+raw_private_key_path = ARGV[0]
+raw_certificate_path = ARGV[1]
+
+if raw_certificate_path.nil? && raw_certificate_path.nil?
+  STDERR.puts "usage: apns-key-convert [path/to/privatekey.p12] [path/to/certificate.cer]".red
+  Process.exit(1)
+end
+
+unless raw_private_key_path =~ /\.p12\z/
+  STDERR.puts "Expected private key to end with .p12.".red
+  STDERR.puts "You should pass the key as you exported it from keychain access."
+  Process.exit(1)
+end
+
+unless File.file?(raw_private_key_path)
+  STDERR.puts "Private key does not exist at #{raw_private_key_path}".red
+  Process.exit(1)
+end
+
+unless raw_certificate_path =~ /\.cer\z/
+  STDERR.puts "Expected certificate to end with .cer.".red
+  STDERR.puts "You should pass the certificate as downloaded from Apple developer tools."
+  Process.exit(1)
+end
+
+unless File.file?(raw_certificate_path)
+  STDERR.puts "Private key does not exist at #{raw_certificate_path}".red
+  Process.exit(1)
+end
+
+require 'openssl'
+require 'io/console'
+
+#
+# Convert the p12 to pem
+#
+
+STDERR.puts "Enter the passphrase for this key: "
+passphrase = STDIN.noecho(&:gets)
+
+begin
+  private_key = OpenSSL::PKCS12.new(File.read(raw_private_key_path), passphrase.chomp)
+rescue OpenSSL::PKCS12::PKCS12Error
+  STDERR.puts "The passphase entered is incorrect. Please check and try again.".red
+  Process.exit(1)
+end
+
+#
+# Convert the certificate to pem
+#
+certificate = OpenSSL::X509::Certificate.new(File.read(raw_certificate_path))
+
+#
+# Puts the resulting file
+#
+
+puts private_key.key.to_s
+puts certificate.to_s
